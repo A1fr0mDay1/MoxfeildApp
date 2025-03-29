@@ -28,6 +28,10 @@ This application uses Android's WebView component to display the Moxfield websit
 2. Open the project in Android Studio
 3. Build and run the application on your device or emulator
 
+Or
+
+1. Download the APK file
+
 ## Usage
 
 Once installed, simply open the app to access Moxfield. The application handles all navigation within the WebView, so you can use it just like the website:
