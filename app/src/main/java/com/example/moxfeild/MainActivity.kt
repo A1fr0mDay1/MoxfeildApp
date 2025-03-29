@@ -1,6 +1,7 @@
 package com.example.moxfeild
 
 import android.os.Bundle
+import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -13,7 +14,6 @@ import java.io.ByteArrayInputStream
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
 
-    // Ad-related domains to block
     private val adDomains = listOf(
         "doubleclick.net",
         "googleadservices.com",
@@ -27,72 +27,93 @@ class MainActivity : ComponentActivity() {
         "amazon-adsystem.com",
         "taboola.com",
         "outbrain.com"
-        // Add more ad domains as needed
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Create WebView
         webView = WebView(this)
         setContentView(webView)
 
-        // Configure WebView with ad blocking capability
+        // Configure CookieManager before setting up WebView
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setAcceptThirdPartyCookies(webView, true)
+
         webView.webViewClient = object : WebViewClient() {
-            // Block ads by intercepting requests
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                 val url = request?.url?.toString() ?: ""
-
-                // Check if the URL contains any ad domain
                 if (adDomains.any { url.contains(it) }) {
-                    // Return empty response to block the ad
                     return WebResourceResponse(
                         "text/plain",
                         "utf-8",
                         ByteArrayInputStream("".toByteArray())
                     )
                 }
-
-                // For non-ad content, let the request proceed normally
                 return super.shouldInterceptRequest(view, request)
             }
 
-            // This method prevents error pages from being displayed
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                // Do nothing - this suppresses the error display
-
-                // Optional: Silently retry loading after a brief delay
                 if (request?.isForMainFrame == true) {
                     view?.postDelayed({
                         webView.reload()
-                    }, 5000) // Try again after 5 seconds
+                    }, 5000)
                 }
+            }
+
+            // Add page finished handler to ensure cookies are saved
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                cookieManager.flush() // Ensure cookies are persisted to storage
             }
         }
 
-        // Configure WebView settings
         val webSettings = webView.settings
-        webSettings.javaScriptEnabled = true // Enable JavaScript for full functionality
-        webSettings.domStorageEnabled = true // Enable DOM storage for modern web apps
-        webSettings.loadWithOverviewMode = true // Load pages to fit in the screen
-        webSettings.useWideViewPort = true // Use wide viewport for better rendering
-        webSettings.builtInZoomControls = true // Enable zoom controls
-        webSettings.displayZoomControls = false // Hide zoom controls after a moment
+        webSettings.javaScriptEnabled = true
+        webSettings.domStorageEnabled = true
+        webSettings.loadWithOverviewMode = true
+        webSettings.useWideViewPort = true
+        webSettings.builtInZoomControls = true
+        webSettings.displayZoomControls = false
+        webSettings.setSupportMultipleWindows(true)
+        webSettings.databaseEnabled = true
 
-        // Optional: Cache the website for offline use
-        webSettings.cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+        // For modern Android: use default cache mode
+        webSettings.cacheMode = WebSettings.LOAD_DEFAULT
 
-        // Load the Moxfield website
-        webView.loadUrl("https://moxfield.com/decks/personal")
+        // Add these for better session persistence
+        webSettings.allowFileAccess = true
+        webSettings.saveFormData = true
+
+        if (savedInstanceState != null) {
+            webView.restoreState(savedInstanceState)
+        } else {
+            webView.loadUrl("https://moxfield.com/decks/personal")
+        }
     }
 
-    // Override the back button to navigate within the WebView
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        webView.saveState(outState)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        CookieManager.getInstance().flush() // Ensure cookies are saved when app is paused
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Optionally refresh the page if needed
+        // webView.reload()
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) {
-            webView.goBack() // Go back in WebView if possible
+            webView.goBack()
         } else {
-            super.onBackPressed() // Otherwise, exit the app
+            super.onBackPressed()
         }
     }
 }
